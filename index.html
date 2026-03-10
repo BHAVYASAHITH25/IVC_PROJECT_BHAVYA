@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smart Study Planner with Productivity Tracker</title>
+    <!-- font awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" integrity="sha512-SlE0F6I+65SyiqaThS+XKHuYI+6+2bS6yEZoT4NBGwXUhcFmYkDF+vE9UQZE+7BvM+r8Dz+6vJfCmJP+Ud3dQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            /* softly tinted gradient background */
+            background: linear-gradient(135deg, #e0f7fa, #f0f4f8);
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            background-color: #4a90e2;
+            width: 100%;
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        main {
+            width: 90%;
+            max-width: 600px;
+            margin-top: 30px;
+        }
+
+        #task-input {
+            width: calc(100% - 260px);
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        #due-date, #priority, #search {
+            padding: 8px;
+            margin-left: 5px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .task-item.high { border-left: 4px solid #ff6b6b; }
+        .task-item.low { border-left: 4px solid #6bff6b; }
+
+        #add-btn {
+            padding: 11px 20px;
+            margin-left: 8px;
+            font-size: 16px;
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #task-list {
+            list-style: none;
+            padding: 0;
+            margin-top: 20px;
+        }
+
+        .task-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: white;
+            margin-bottom: 10px;
+            padding: 10px 15px;
+            border-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .task-item.completed .text {
+            text-decoration: line-through;
+            color: #777;
+        }
+
+        .text {
+            flex: 1;
+            margin-right: 10px;
+        }
+
+        .actions button {
+            margin-left: 5px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        #productivity {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 18px;
+        }
+
+        /* additional controls */
+        #controls {
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        #controls button {
+            margin: 0 5px;
+            padding: 8px 12px;
+            font-size: 14px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #ff6b6b;
+            color: white;
+        }
+
+        #controls button.clear-all {
+            background-color: #888;
+        }
+
+        /* progress bar */
+        #progress-container {
+            width: 100%;
+            background: #ddd;
+            border-radius: 4px;
+            height: 12px;
+            margin-top: 6px;
+            overflow: hidden;
+        }
+
+        #progress-bar {
+            height: 100%;
+            background: #4a90e2;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Smart Study Planner</h1>
+    </header>
+    <main>
+        <div id="input-area">
+            <input type="text" id="task-input" placeholder="Enter study task" />
+            <input type="date" id="due-date" title="Due date" />
+            <select id="priority">
+                <option value="normal">Normal</option>
+                <option value="high">High 🔥</option>
+                <option value="low">Low</option>
+            </select>
+            <button id="add-btn"><i class="fa fa-plus"></i> Add</button>
+        </div>
+        <div id="controls">
+            <button id="filter-all" class="filter-btn"><i class="fa fa-list"></i> All</button>
+            <button id="filter-active" class="filter-btn"><i class="fa fa-circle"></i> Active</button>
+            <button id="filter-completed" class="filter-btn"><i class="fa fa-check-circle"></i> Completed</button>
+            <input type="text" id="search" placeholder="Search…" />
+            <button id="clear-completed"><i class="fa fa-trash-restore"></i> Clear Completed</button>
+            <button id="clear-all" class="clear-all"><i class="fa fa-trash"></i> Clear All</button>
+        </div>
+        <ul id="task-list"></ul>
+        <div id="productivity">Productivity: 0%</div>
+        <div id="progress-container"><div id="progress-bar"></div></div>
+    </main>
+
+    <script>
+        const taskInput = document.getElementById('task-input');
+        const addBtn = document.getElementById('add-btn');
+        const taskList = document.getElementById('task-list');
+        const productivity = document.getElementById('productivity');
+
+        let tasks = [];
+        let currentFilter = 'all';
+        let searchTerm = '';
+
+        function loadTasks() {
+            const stored = localStorage.getItem('studyTasks');
+            if (stored) {
+                tasks = JSON.parse(stored);
+            }
+        }
+
+        function saveTasks() {
+            localStorage.setItem('studyTasks', JSON.stringify(tasks));
+        }
+
+        function renderTasks() {
+            searchTerm = document.getElementById('search').value.trim();
+            taskList.innerHTML = '';
+            tasks.forEach((task, index) => {
+                // apply filter/search
+                if (currentFilter === 'active' && task.completed) return;
+                if (currentFilter === 'completed' && !task.completed) return;
+                if (searchTerm && !task.text.toLowerCase().includes(searchTerm.toLowerCase())) return;
+
+                const li = document.createElement('li');
+                li.className = 'task-item ' + (task.priority) + (task.completed ? ' completed' : '');
+
+                const span = document.createElement('span');
+                span.className = 'text';
+                span.textContent = task.text;
+
+                // show due date / priority info
+                const info = document.createElement('small');
+                info.textContent = (task.due || '') + (task.priority && task.priority !== 'normal' ? ' (' + task.priority + ')' : '');
+                if (info.textContent) span.appendChild(info);
+
+                // allow editing on double click
+                span.addEventListener('dblclick', () => {
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = task.text;
+                    input.className = 'text';
+                    input.addEventListener('keypress', e => {
+                        if (e.key === 'Enter') {
+                            finishEdit();
+                        }
+                    });
+                    input.addEventListener('blur', finishEdit);
+                    function finishEdit() {
+                        const newText = input.value.trim();
+                        if (newText) {
+                            tasks[index].text = newText;
+                            update();
+                        } else {
+                            // if cleared, delete the task
+                            tasks.splice(index, 1);
+                            update();
+                        }
+                    }
+                    li.replaceChild(input, span);
+                    input.focus();
+                });
+
+                const actions = document.createElement('div');
+                actions.className = 'actions';
+
+                const completeBtn = document.createElement('button');
+                completeBtn.textContent = task.completed ? '✅' : '⬜';
+                completeBtn.title = task.completed ? 'Mark as incomplete' : 'Mark as complete';
+                completeBtn.addEventListener('click', () => {
+                    tasks[index].completed = !tasks[index].completed;
+                    update();
+                });
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '🗑️';
+                deleteBtn.title = 'Delete task';
+                deleteBtn.addEventListener('click', () => {
+                    tasks.splice(index, 1);
+                    update();
+                });
+
+                actions.appendChild(completeBtn);
+                actions.appendChild(deleteBtn);
+
+                li.appendChild(span);
+                li.appendChild(actions);
+
+                taskList.appendChild(li);
+            });
+            updateProductivity();
+        }
+
+        function updateProductivity() {
+            if (tasks.length === 0) {
+                productivity.textContent = 'Productivity: 0%';
+                document.getElementById('progress-bar').style.width = '0%';
+                return;
+            }
+            const completedCount = tasks.filter(t => t.completed).length;
+            const percent = Math.round((completedCount / tasks.length) * 100);
+            productivity.textContent = `Productivity: ${percent}%`;
+            document.getElementById('progress-bar').style.width = percent + '%';
+        }
+
+        function update() {
+            renderTasks();
+            saveTasks();
+            taskInput.value = '';
+            taskInput.focus();
+        }
+
+        addBtn.addEventListener('click', () => {
+            const text = taskInput.value.trim();
+            if (text === '') return;
+            const due = document.getElementById('due-date').value;
+            const priority = document.getElementById('priority').value;
+            tasks.push({ text, completed: false, due, priority });
+            update();
+        });
+
+        document.getElementById('filter-all').addEventListener('click', () => { currentFilter='all'; update(); });
+        document.getElementById('filter-active').addEventListener('click', () => { currentFilter='active'; update(); });
+        document.getElementById('filter-completed').addEventListener('click', () => { currentFilter='completed'; update(); });
+
+        document.getElementById('search').addEventListener('input', () => {
+            renderTasks();
+        });
+
+        document.getElementById('clear-completed').addEventListener('click', () => {
+            tasks = tasks.filter(t => !t.completed);
+            update();
+        });
+
+        document.getElementById('clear-all').addEventListener('click', () => {
+            if (confirm('Are you sure you want to delete all tasks?')) {
+                tasks = [];
+                update();
+            }
+        });
+
+        taskInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                addBtn.click();
+            }
+        });
+
+        // load saved tasks and show
+        loadTasks();
+        renderTasks();
+    </script>
+</body>
+</html>
